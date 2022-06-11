@@ -4,6 +4,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
+using Microsoft.Extensions.Configuration;
+using System.IO;
+using Serilog;
 
 namespace WorkingConsoleDB
 {
@@ -13,18 +16,21 @@ namespace WorkingConsoleDB
         {
             try
             {
-                Console.WriteLine("sup 1");
-                //  CreateHostBuilder(args).Build().Run();
-                Console.WriteLine("sup 2");
-                var contextOptions = new DbContextOptionsBuilder<PeopleContext>().UseSqlServer("Data Source=.\\SQL2017;Initial Catalog=DemoMe;Integrated Security=True;").Options;
 
-                //   using var context = new ApplicationDbContext(contextOptions);
-                PeopleContext db = new PeopleContext(contextOptions);
-                db.People.Add(new Person());
-                db.SaveChanges();
-                Console.WriteLine("sup 3");
+                IConfigurationBuilder builder = new ConfigurationBuilder();
+                BuildConfig(builder);
+                //instantiating logging service
+                Log.Logger = new LoggerConfiguration().ReadFrom.Configuration(builder.Build()).Enrich.FromLogContext().CreateLogger();
+                Log.Logger.Information("Application Starting");
+
+                var host = Host.CreateDefaultBuilder().ConfigureServices((context, services) =>
+                {               
+                }).UseSerilog().Build();
+
+                var contextOptions = new DbContextOptionsBuilder<PeopleContext>().UseSqlServer(builder.Build().GetConnectionString("Default")).Options;
+
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Console.WriteLine(ex);
             }
@@ -37,9 +43,15 @@ namespace WorkingConsoleDB
                     services.AddDbContext<PeopleContext>(options =>
                     {
                         //options.UseSqlServer(builder.Build().GetConnectionString("Default"));
-                        options.UseSqlServer("Data Source=.\\SQL2017;Initial Catalog=DemoMe;Integrated Security=True;");
+                        options.UseSqlServer("Data Source=.\\MYSQLSERVER;Initial Catalog=DemoMe;Integrated Security=True;");
 
                     });
                 });
+        static void BuildConfig(IConfigurationBuilder builder)
+        {
+            builder.SetBasePath(Directory.GetCurrentDirectory()).AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"}.json", optional: true)
+                .AddEnvironmentVariables();
+        }
     }
 }
